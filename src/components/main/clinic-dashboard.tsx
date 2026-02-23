@@ -429,6 +429,7 @@ export default function ClinicDashboard() {
           </form>
           <div className="mt-3 flex gap-2">
             <select
+              aria-label="Clinic"
               value={clinicId}
               onChange={(e) => setClinicId(e.target.value)}
               className="flex-1 rounded-md border px-3 py-2 text-sm"
@@ -501,6 +502,7 @@ export default function ClinicDashboard() {
             className="grid gap-3 sm:grid-cols-2"
           >
             <select
+              aria-label="Patient"
               value={patientId}
               onChange={(e) => setPatientId(e.target.value)}
               className="rounded-md border px-3 py-2 text-sm sm:col-span-2"
@@ -514,6 +516,7 @@ export default function ClinicDashboard() {
             </select>
 
             <input
+              aria-label="Appointment date and time"
               required
               type="datetime-local"
               value={appointmentAt}
@@ -533,6 +536,7 @@ export default function ClinicDashboard() {
               </p>
               <div className="grid gap-2 sm:grid-cols-3">
                 <select
+                  title="Number of reminders"
                   value={reminderCount}
                   onChange={(e) =>
                     setReminderCount(Number(e.target.value) as 1 | 2)
@@ -584,6 +588,7 @@ export default function ClinicDashboard() {
                   placeholder="Value"
                 />
                 <select
+                  title="Unit of time"
                   value={followUpUnit}
                   onChange={(e) =>
                     setFollowUpUnit(e.target.value as "days" | "months")
