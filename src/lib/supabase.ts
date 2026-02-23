@@ -49,6 +49,28 @@ export type ReminderRow = {
   } | null;
 };
 
+export type AppointmentReminderRow = {
+  id: string;
+  reminder_at: string;
+  sms_sent_at: string | null;
+  message: string | null;
+};
+
+export type AppointmentRow = {
+  id: string;
+  clinic_id: string;
+  patient_id: string;
+  appointment_at: string;
+  notes: string | null;
+  patient: {
+    first_name: string;
+    last_name: string;
+    phone: string | null;
+    email: string | null;
+  } | null;
+  reminders: AppointmentReminderRow[];
+};
+
 export type ClinicRow = { id: string; name: string; created_at?: string };
 
 export type PatientRow = {
@@ -83,6 +105,33 @@ export async function listPatientsByClinic(clinicId: string) {
 
   return supabaseRequest<PatientRow[]>(
     `/rest/v1/patients?${params.toString()}`,
+    {
+      method: "GET",
+    }
+  );
+}
+
+export async function listAppointmentsByClinicAndDate(
+  clinicId: string,
+  date: string
+) {
+  const start = new Date(`${date}T00:00:00`);
+  const end = new Date(`${date}T23:59:59.999`);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    throw new Error("date must be a valid YYYY-MM-DD string");
+  }
+
+  const params = new URLSearchParams({
+    select:
+      "id,clinic_id,patient_id,appointment_at,notes,patient:patients(first_name,last_name,phone,email),reminders:appointment_reminders(id,reminder_at,sms_sent_at,message)",
+    clinic_id: `eq.${clinicId}`,
+    and: `(appointment_at.gte.${start.toISOString()},appointment_at.lte.${end.toISOString()})`,
+    order: "appointment_at.asc",
+  });
+
+  return supabaseRequest<AppointmentRow[]>(
+    `/rest/v1/patient_appointments?${params.toString()}`,
     {
       method: "GET",
     }
@@ -173,24 +222,24 @@ export async function createPatient(input: PatientInsert) {
   return rows[0];
 }
 
-type ReminderInsert = {
+type AppointmentInsert = {
   clinic_id: string;
   patient_id: string;
-  reminder_at: string;
-  message: string | null;
+  appointment_at: string;
+  notes: string | null;
 };
 
-type ReminderCreatedRow = {
+type AppointmentCreatedRow = {
   id: string;
   clinic_id: string;
   patient_id: string;
-  reminder_at: string;
-  message: string | null;
+  appointment_at: string;
+  notes: string | null;
 };
 
-export async function createReminder(input: ReminderInsert) {
-  const rows = await supabaseRequest<ReminderCreatedRow[]>(
-    `/rest/v1/appointment_reminders`,
+export async function createAppointment(input: AppointmentInsert) {
+  const rows = await supabaseRequest<AppointmentCreatedRow[]>(
+    `/rest/v1/patient_appointments`,
     {
       method: "POST",
       headers: {
@@ -200,5 +249,42 @@ export async function createReminder(input: ReminderInsert) {
     }
   );
 
+  return rows[0];
+}
+
+type ReminderInsert = {
+  clinic_id: string;
+  patient_id: string;
+  appointment_id?: string | null;
+  reminder_at: string;
+  message: string | null;
+};
+
+type ReminderCreatedRow = {
+  id: string;
+  clinic_id: string;
+  patient_id: string;
+  appointment_id: string | null;
+  reminder_at: string;
+  message: string | null;
+};
+
+export async function createReminders(input: ReminderInsert[]) {
+  if (input.length === 0) return [] as ReminderCreatedRow[];
+
+  return supabaseRequest<ReminderCreatedRow[]>(
+    `/rest/v1/appointment_reminders`,
+    {
+      method: "POST",
+      headers: {
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify(input),
+    }
+  );
+}
+
+export async function createReminder(input: ReminderInsert) {
+  const rows = await createReminders([input]);
   return rows[0];
 }
