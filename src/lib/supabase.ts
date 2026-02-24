@@ -60,8 +60,15 @@ export type AppointmentRow = {
   id: string;
   clinic_id: string;
   patient_id: string;
+  procedure_id: string | null;
+  duration_minutes: number | null;
   appointment_at: string;
   notes: string | null;
+  procedure: {
+    name: string;
+    slot_count: number | null;
+    slot_minutes: number;
+  } | null;
   patient: {
     first_name: string;
     last_name: string;
@@ -80,6 +87,27 @@ export type PatientRow = {
   last_name: string;
   phone: string | null;
   email: string | null;
+};
+
+export type WorkingHoursRow = {
+  clinic_id: string;
+  workday_start: string;
+  workday_end: string;
+};
+
+export type ProcedureRow = {
+  id: string;
+  clinic_id: string;
+  name: string;
+  slot_count: number | null;
+  slot_minutes: number;
+};
+
+export type WorkBreakRow = {
+  id: string;
+  clinic_id: string;
+  break_start: string;
+  break_end: string;
 };
 
 export async function listClinics() {
@@ -124,7 +152,7 @@ export async function listAppointmentsByClinicAndDate(
 
   const params = new URLSearchParams({
     select:
-      "id,clinic_id,patient_id,appointment_at,notes,patient:patients(first_name,last_name,phone,email),reminders:appointment_reminders(id,reminder_at,sms_sent_at,message)",
+      "id,clinic_id,patient_id,procedure_id,duration_minutes,appointment_at,notes,procedure:clinic_procedures(name,slot_count,slot_minutes),patient:patients(first_name,last_name,phone,email),reminders:appointment_reminders(id,reminder_at,sms_sent_at,message)",
     clinic_id: `eq.${clinicId}`,
     and: `(appointment_at.gte.${start.toISOString()},appointment_at.lte.${end.toISOString()})`,
     order: "appointment_at.asc",
@@ -136,6 +164,114 @@ export async function listAppointmentsByClinicAndDate(
       method: "GET",
     }
   );
+}
+
+export async function getClinicWorkingHours(clinicId: string) {
+  const params = new URLSearchParams({
+    select: "clinic_id,workday_start,workday_end",
+    clinic_id: `eq.${clinicId}`,
+    limit: "1",
+  });
+
+  const rows = await supabaseRequest<WorkingHoursRow[]>(
+    `/rest/v1/clinic_working_hours?${params.toString()}`,
+    { method: "GET" }
+  );
+
+  return rows[0] ?? null;
+}
+
+export async function upsertClinicWorkingHours(input: WorkingHoursRow) {
+  const rows = await supabaseRequest<WorkingHoursRow[]>(
+    `/rest/v1/clinic_working_hours`,
+    {
+      method: "POST",
+      headers: {
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify(input),
+    }
+  );
+
+  return rows[0];
+}
+
+export async function listProceduresByClinic(clinicId: string) {
+  const params = new URLSearchParams({
+    select: "id,clinic_id,name,slot_count,slot_minutes",
+    clinic_id: `eq.${clinicId}`,
+    order: "created_at.asc",
+  });
+
+  return supabaseRequest<ProcedureRow[]>(
+    `/rest/v1/clinic_procedures?${params.toString()}`,
+    { method: "GET" }
+  );
+}
+
+type ProcedureInsert = {
+  clinic_id: string;
+  name: string;
+  slot_minutes: number;
+  slot_count?: number;
+};
+
+export async function createProcedure(input: ProcedureInsert) {
+  const rows = await supabaseRequest<ProcedureRow[]>(`/rest/v1/clinic_procedures`, {
+    method: "POST",
+    headers: {
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(input),
+  });
+
+  return rows[0];
+}
+
+export async function getProcedureById(procedureId: string) {
+  const params = new URLSearchParams({
+    select: "id,clinic_id,name,slot_count,slot_minutes",
+    id: `eq.${procedureId}`,
+    limit: "1",
+  });
+
+  const rows = await supabaseRequest<ProcedureRow[]>(
+    `/rest/v1/clinic_procedures?${params.toString()}`,
+    { method: "GET" }
+  );
+
+  return rows[0] ?? null;
+}
+
+export async function listWorkBreaksByClinic(clinicId: string) {
+  const params = new URLSearchParams({
+    select: "id,clinic_id,break_start,break_end",
+    clinic_id: `eq.${clinicId}`,
+    order: "break_start.asc",
+  });
+
+  return supabaseRequest<WorkBreakRow[]>(
+    `/rest/v1/clinic_work_breaks?${params.toString()}`,
+    { method: "GET" }
+  );
+}
+
+type WorkBreakInsert = {
+  clinic_id: string;
+  break_start: string;
+  break_end: string;
+};
+
+export async function createWorkBreak(input: WorkBreakInsert) {
+  const rows = await supabaseRequest<WorkBreakRow[]>(`/rest/v1/clinic_work_breaks`, {
+    method: "POST",
+    headers: {
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(input),
+  });
+
+  return rows[0];
 }
 
 export async function fetchDueReminders(clinicId: string) {
@@ -225,6 +361,8 @@ export async function createPatient(input: PatientInsert) {
 type AppointmentInsert = {
   clinic_id: string;
   patient_id: string;
+  procedure_id: string | null;
+  duration_minutes: number | null;
   appointment_at: string;
   notes: string | null;
 };
